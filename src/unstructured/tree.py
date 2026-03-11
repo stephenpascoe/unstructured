@@ -6,6 +6,8 @@ import random
 import string
 from typing import Generator
 
+from unstructured.plan import FilesystemPlan
+
 
 def _random_suffix(length: int = 6) -> str:
     return "".join(random.choices(string.ascii_lowercase + string.digits, k=length))
@@ -98,13 +100,13 @@ class FilesystemTree:
         plan = self.plan
         if remaining_depth <= 0:
             # Leaf node
-            num_files = _rand_int(plan.leaf_file_avg, plan.leaf_file_delta)
+            num_files = _rand_int(self.plan.leaf_file_avg, self.plan.leaf_file_delta)
             files = [f"file_{_random_suffix()}" for _ in range(num_files)]
             return _Node(name="root", files=files, children=[])
 
         # Non-leaf node
-        num_files = _rand_int(plan.node_file_avg, plan.node_file_delta)
-        num_dirs = _rand_int(plan.node_dir_avg, plan.node_dir_delta)
+        num_files = _rand_int(self.plan.node_file_avg, self.plan.node_file_delta)
+        num_dirs = _rand_int(self.plan.node_dir_avg, self.plan.node_dir_delta)
         files = [f"file_{_random_suffix()}" for _ in range(num_files)]
         children = []
         for _ in range(num_dirs):
