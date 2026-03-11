@@ -1,0 +1,16 @@
+[project]
+name = "unstructured"
+version = "0.1.0"
+description = "Generate large filesystem trees for testing unstructured data management tools"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.scripts]
+unstructured = "unstructured.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = ["pytest"]
