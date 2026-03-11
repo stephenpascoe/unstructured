@@ -1,3 +1,4 @@
+import dataclasses
 import pathlib
 import types
 
@@ -11,13 +12,9 @@ class TestFilesystemTreeConstruction:
     def test_default_construction(self) -> None:
         plan = FilesystemPlan(
             depth_avg=2,
-            depth_delta=0,
             leaf_file_avg=3,
-            leaf_file_delta=0,
             node_file_avg=1,
-            node_file_delta=0,
             node_dir_avg=2,
-            node_dir_delta=0,
         )
         tree = FilesystemTree(plan)
         assert tree.plan.depth_avg == 2
@@ -66,7 +63,6 @@ class TestFilesystemTreeZeroDelta:
         tree = FilesystemTree(plan)
         # 2 subdirs
         assert tree.dir_count() == 2
-        # 1 file in root (node) + 3 files in each of 2 leaf dirs = 7
         assert tree.file_count() == 7
 
     def test_depth_two_structure(self) -> None:
@@ -77,7 +73,6 @@ class TestFilesystemTreeZeroDelta:
         tree = FilesystemTree(plan)
         # root has 2 subdirs, each has 2 leaf subdirs = 2 + 4 = 6
         assert tree.dir_count() == 6
-        # root: 1 file, 2 node dirs: 1 file each, 4 leaf dirs: 3 files each = 1 + 2 + 12 = 15
         assert tree.file_count() == 15
 
 
@@ -96,7 +91,6 @@ class TestPathList:
         )
         tree = FilesystemTree(plan)
         paths = list(tree.path_list())
-        # 2 dirs + 1 node file + 2*2 leaf files = 7
         assert len(paths) == 2 + 1 + 4
 
 
@@ -162,7 +156,7 @@ class TestApply:
         tree.apply(tmp_path)
         all_files = list(tmp_path.rglob("file_*"))
         all_dirs = [d for d in tmp_path.rglob("dir_*") if d.is_dir()]
-        assert len(all_files) == 5  # 1 node + 2*2 leaf
+        assert len(all_files) == 5
         assert len(all_dirs) == 2
 
 

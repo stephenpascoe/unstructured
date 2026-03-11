@@ -74,6 +74,7 @@ def apply_cmd(target: pathlib.Path, **kwargs: int) -> None:
     click.echo(
         f"Created {tree.file_count()} files and {tree.dir_count()} directories under {target}"
     )
+    tree = FilesystemTree(plan)
 
 
 @main.command("estimate-storage", help="Estimate logical storage for a FilesystemPlan.")
