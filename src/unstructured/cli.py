@@ -4,7 +4,7 @@ import argparse
 import pathlib
 import sys
 
-from unstructured.tree import FilesystemTree
+from unstructured.tree import FilesystemPlan, FilesystemTree
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -35,7 +35,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> None:
     args = parse_args(argv)
 
-    tree = FilesystemTree(
+    plan = FilesystemPlan(
         depth_avg=args.depth_avg,
         depth_delta=args.depth_delta,
         leaf_file_avg=args.leaf_file_avg,
@@ -45,6 +45,7 @@ def main(argv: list[str] | None = None) -> None:
         node_dir_avg=args.node_dir_avg,
         node_dir_delta=args.node_dir_delta,
     )
+    tree = FilesystemTree(plan)
 
     if args.command == "file-count":
         print(tree.file_count())

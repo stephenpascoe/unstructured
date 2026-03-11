@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import pathlib
 import random
 import string
@@ -20,6 +21,61 @@ def _rand_int(avg: int, delta: int) -> int:
     return _clamp_non_negative(random.randint(avg - delta, avg + delta))
 
 
+@dataclasses.dataclass
+class FilesystemPlan:
+    """Parameters used to construct a FilesystemTree, without generating random files/dirs."""
+
+    depth_avg: int
+    depth_delta: int
+    leaf_file_avg: int
+    leaf_file_delta: int
+    node_file_avg: int
+    node_file_delta: int
+    node_dir_avg: int
+    node_dir_delta: int
+
+    def _estimated_dir_count(self) -> int:
+        """Estimate number of directories using avg parameters (ignoring delta)."""
+        D = self.depth_avg
+        N = self.node_dir_avg
+        if D == 0 or N == 0:
+            return 0
+        if N == 1:
+            return D
+        return round(N * (N**D - 1) / (N - 1))
+
+    def _estimated_file_count(self) -> int:
+        """Estimate number of files using avg parameters (ignoring delta)."""
+        D = self.depth_avg
+        N = self.node_dir_avg
+        Lf = self.leaf_file_avg
+        Nf = self.node_file_avg
+        if N == 0 or D == 0:
+            # Root is a leaf
+            return Lf
+        leaf_nodes = N**D
+        if N == 1:
+            non_leaf_nodes = D
+        else:
+            non_leaf_nodes = round((N**D - 1) / (N - 1))
+        return Nf * non_leaf_nodes + Lf * leaf_nodes
+
+    def estimate_logical_storage(self, block_size: int, inode_size: int, dirent_size: int) -> int:
+        """Estimate bytes consumed if this plan were materialised.
+
+        Assumes each file consumes 1 block. Accounts for inodes and directory
+        entries. Ignores erasure encoding, filesystem metadata and replication.
+        """
+        file_count = self._estimated_file_count()
+        dir_count = self._estimated_dir_count()
+        storage = (
+            file_count * block_size
+            + (file_count + dir_count) * inode_size
+            + (file_count + dir_count) * dirent_size
+        )
+        return storage
+
+
 class _Node:
     """Internal representation of a node in the filesystem tree."""
 
@@ -32,44 +88,27 @@ class _Node:
 class FilesystemTree:
     """Encapsulates the structure of a random filesystem tree."""
 
-    def __init__(
-        self,
-        *,
-        depth_avg: int,
-        depth_delta: int,
-        leaf_file_avg: int,
-        leaf_file_delta: int,
-        node_file_avg: int,
-        node_file_delta: int,
-        node_dir_avg: int,
-        node_dir_delta: int,
-    ) -> None:
-        self.depth_avg = depth_avg
-        self.depth_delta = depth_delta
-        self.leaf_file_avg = leaf_file_avg
-        self.leaf_file_delta = leaf_file_delta
-        self.node_file_avg = node_file_avg
-        self.node_file_delta = node_file_delta
-        self.node_dir_avg = node_dir_avg
-        self.node_dir_delta = node_dir_delta
-
-        self._root = self._build_tree(remaining_depth=_rand_int(depth_avg, depth_delta))
+    def __init__(self, plan: FilesystemPlan) -> None:
+        self.plan = plan
+        self._root = self._build_tree(
+            remaining_depth=_rand_int(plan.depth_avg, plan.depth_delta)
+        )
 
     def _build_tree(self, remaining_depth: int) -> _Node:
+        plan = self.plan
         if remaining_depth <= 0:
             # Leaf node
-            num_files = _rand_int(self.leaf_file_avg, self.leaf_file_delta)
+            num_files = _rand_int(plan.leaf_file_avg, plan.leaf_file_delta)
             files = [f"file_{_random_suffix()}" for _ in range(num_files)]
             return _Node(name="root", files=files, children=[])
 
         # Non-leaf node
-        num_files = _rand_int(self.node_file_avg, self.node_file_delta)
-        num_dirs = _rand_int(self.node_dir_avg, self.node_dir_delta)
+        num_files = _rand_int(plan.node_file_avg, plan.node_file_delta)
+        num_dirs = _rand_int(plan.node_dir_avg, plan.node_dir_delta)
         files = [f"file_{_random_suffix()}" for _ in range(num_files)]
         children = []
         for _ in range(num_dirs):
-            child_depth = remaining_depth - 1
-            child = self._build_tree(remaining_depth=child_depth)
+            child = self._build_tree(remaining_depth=remaining_depth - 1)
             child.name = f"dir_{_random_suffix()}"
             children.append(child)
         return _Node(name="root", files=files, children=children)

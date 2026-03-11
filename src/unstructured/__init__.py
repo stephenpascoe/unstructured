@@ -1,3 +1,3 @@
-from unstructured.tree import FilesystemTree
+from unstructured.tree import FilesystemPlan, FilesystemTree
 
-__all__ = ["FilesystemTree"]
+__all__ = ["FilesystemPlan", "FilesystemTree"]
