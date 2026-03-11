@@ -1,61 +1,92 @@
 from __future__ import annotations
 
-import argparse
 import pathlib
-import sys
 
+import click
+
+from unstructured.plan import FilesystemPlan
 from unstructured.tree import FilesystemTree
 
 
-def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Generate large filesystem trees for testing.",
-    )
-    parser.add_argument("--depth-avg", type=int, required=True, help="Average depth of subdirs.")
-    parser.add_argument("--depth-delta", type=int, default=0, help="Depth variation +/-.")
-    parser.add_argument("--leaf-file-avg", type=int, required=True, help="Average files per leaf dir.")
-    parser.add_argument("--leaf-file-delta", type=int, default=0, help="Leaf file variation +/-.")
-    parser.add_argument("--node-file-avg", type=int, default=0, help="Average files per non-leaf dir.")
-    parser.add_argument("--node-file-delta", type=int, default=0, help="Node file variation +/-.")
-    parser.add_argument("--node-dir-avg", type=int, required=True, help="Average subdirs per non-leaf dir.")
-    parser.add_argument("--node-dir-delta", type=int, default=0, help="Node dir variation +/-.")
-
-    subparsers = parser.add_subparsers(dest="command", required=True)
-
-    subparsers.add_parser("file-count", help="Print the total number of files.")
-    subparsers.add_parser("dir-count", help="Print the total number of directories.")
-    subparsers.add_parser("path-list", help="Print all paths in the tree.")
-
-    apply_parser = subparsers.add_parser("apply", help="Materialise the tree at a given path.")
-    apply_parser.add_argument("target", type=pathlib.Path, help="Target directory.")
-
-    return parser.parse_args(argv)
+def _plan_options(f):  # noqa: ANN001, ANN202
+    """Shared click options for building a FilesystemPlan."""
+    f = click.option("--depth-avg", type=int, required=True, help="Average depth of subdirs.")(f)
+    f = click.option("--depth-delta", type=int, default=0, help="Depth variation +/-.")(f)
+    f = click.option("--leaf-file-avg", type=int, required=True, help="Average files per leaf dir.")(f)
+    f = click.option("--leaf-file-delta", type=int, default=0, help="Leaf file variation +/-.")(f)
+    f = click.option("--node-file-avg", type=int, default=0, help="Average files per non-leaf dir.")(f)
+    f = click.option("--node-file-delta", type=int, default=0, help="Node file variation +/-.")(f)
+    f = click.option("--node-dir-avg", type=int, required=True, help="Average subdirs per non-leaf dir.")(f)
+    f = click.option("--node-dir-delta", type=int, default=0, help="Node dir variation +/-.")(f)
+    return f
 
 
-def main(argv: list[str] | None = None) -> None:
-    args = parse_args(argv)
-
-    tree = FilesystemTree(
-        depth_avg=args.depth_avg,
-        depth_delta=args.depth_delta,
-        leaf_file_avg=args.leaf_file_avg,
-        leaf_file_delta=args.leaf_file_delta,
-        node_file_avg=args.node_file_avg,
-        node_file_delta=args.node_file_delta,
-        node_dir_avg=args.node_dir_avg,
-        node_dir_delta=args.node_dir_delta,
+def _make_plan(kwargs: dict) -> FilesystemPlan:  # noqa: ANN001
+    return FilesystemPlan(
+        depth_avg=kwargs["depth_avg"],
+        depth_delta=kwargs["depth_delta"],
+        leaf_file_avg=kwargs["leaf_file_avg"],
+        leaf_file_delta=kwargs["leaf_file_delta"],
+        node_file_avg=kwargs["node_file_avg"],
+        node_file_delta=kwargs["node_file_delta"],
+        node_dir_avg=kwargs["node_dir_avg"],
+        node_dir_delta=kwargs["node_dir_delta"],
     )
 
-    if args.command == "file-count":
-        print(tree.file_count())
-    elif args.command == "dir-count":
-        print(tree.dir_count())
-    elif args.command == "path-list":
-        for p in tree.path_list():
-            print(p)
-    elif args.command == "apply":
-        tree.apply(args.target)
-        print(f"Created {tree.file_count()} files and {tree.dir_count()} directories under {args.target}")
+
+@click.group(help="Generate large filesystem trees for testing.")
+def main() -> None:
+    pass
+
+
+@main.command("file-count", help="Print the total number of files.")
+@_plan_options
+def file_count(**kwargs: int) -> None:
+    plan = _make_plan(kwargs)
+    tree = FilesystemTree(plan)
+    click.echo(tree.file_count())
+
+
+@main.command("dir-count", help="Print the total number of directories.")
+@_plan_options
+def dir_count(**kwargs: int) -> None:
+    plan = _make_plan(kwargs)
+    tree = FilesystemTree(plan)
+    click.echo(tree.dir_count())
+
+
+@main.command("path-list", help="Print all paths in the tree.")
+@_plan_options
+def path_list(**kwargs: int) -> None:
+    plan = _make_plan(kwargs)
+    tree = FilesystemTree(plan)
+    for p in tree.path_list():
+        click.echo(p)
+
+
+@main.command("apply", help="Materialise the tree at a given path.")
+@_plan_options
+@click.argument("target", type=click.Path(path_type=pathlib.Path))
+def apply_cmd(target: pathlib.Path, **kwargs: int) -> None:
+    plan = _make_plan(kwargs)
+    tree = FilesystemTree(plan)
+    tree.apply(target)
+    click.echo(
+        f"Created {tree.file_count()} files and {tree.dir_count()} directories under {target}"
+    )
+
+
+@main.command("estimate-storage", help="Estimate logical storage for a FilesystemPlan.")
+@_plan_options
+@click.option("--block-size", type=int, default=4096, help="Block size in bytes.")
+@click.option("--inode-size", type=int, default=256, help="Inode size in bytes.")
+@click.option("--dirent-size", type=int, default=256, help="Directory entry size in bytes.")
+def estimate_storage(
+    block_size: int, inode_size: int, dirent_size: int, **kwargs: int
+) -> None:
+    plan = _make_plan(kwargs)
+    total = plan.estimate_logical_storage(block_size, inode_size, dirent_size)
+    click.echo(total)
 
 
 if __name__ == "__main__":
