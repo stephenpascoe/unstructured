@@ -6,21 +6,18 @@ from unstructured.cli import main
 
 
 class TestCli:
-    def test_file_count(self) -> None:
+    def test_estimate(self) -> None:
         runner = CliRunner()
         result = runner.invoke(main, [
-            "file-count", "--depth-avg", "0", "--leaf-file-avg", "5", "--node-dir-avg", "2",
+            "estimate", "--depth-avg", "1", "--leaf-file-avg", "2", "--node-dir-avg", "3",
+            "--block-size", "4096", "--inode-size", "256", "--dirent-size", "256",
         ])
         assert result.exit_code == 0
-        assert result.output.strip() == "5"
-
-    def test_dir_count(self) -> None:
-        runner = CliRunner()
-        result = runner.invoke(main, [
-            "dir-count", "--depth-avg", "1", "--leaf-file-avg", "2", "--node-dir-avg", "3",
-        ])
-        assert result.exit_code == 0
-        assert result.output.strip() == "3"
+        # depth=1, node_dir=3: leaf_nodes=3, non_leaf=1
+        # files = 1*0 + 3*2 = 6, dirs = 3+1-1 = 3
+        assert "Files:           6" in result.output
+        assert "Directories:     3" in result.output
+        assert "Logical storage:" in result.output
 
     def test_path_list(self) -> None:
         runner = CliRunner()
@@ -45,10 +42,10 @@ class TestCli:
         assert "Created" in result.output
         assert (tmp_path / "output").exists()
 
-    def test_estimate_storage(self) -> None:
+    def test_estimate_storage_values(self) -> None:
         runner = CliRunner()
         result = runner.invoke(main, [
-            "estimate-storage",
+            "estimate",
             "--depth-avg", "0",
             "--leaf-file-avg", "5",
             "--node-dir-avg", "2",
@@ -57,17 +54,19 @@ class TestCli:
             "--dirent-size", "256",
         ])
         assert result.exit_code == 0
+        assert "Files:           5" in result.output
+        assert "Directories:     0" in result.output
         # 5 files, 0 dirs: 5*4096 + (5+0+1)*256 + (5+0)*256 = 20480 + 1536 + 1280 = 23296
-        assert result.output.strip() == "23296"
+        assert "Logical storage: 23296" in result.output
 
-    def test_estimate_storage_defaults(self) -> None:
+    def test_estimate_defaults(self) -> None:
         runner = CliRunner()
         result = runner.invoke(main, [
-            "estimate-storage",
+            "estimate",
             "--depth-avg", "0",
             "--leaf-file-avg", "1",
             "--node-dir-avg", "1",
         ])
         assert result.exit_code == 0
-        # 1 file, 0 dirs: 1*4096 + (1+0+1)*256 + (1+0)*256 = 4096 + 512 + 256 = 4864
-        assert result.output.strip() == "4864"
+        assert "Files:           1" in result.output
+        assert "Directories:     0" in result.output

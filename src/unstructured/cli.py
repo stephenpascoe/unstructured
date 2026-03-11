@@ -39,22 +39,6 @@ def main() -> None:
     pass
 
 
-@main.command("file-count", help="Print the total number of files.")
-@_plan_options
-def file_count(**kwargs: int) -> None:
-    plan = _make_plan(kwargs)
-    tree = FilesystemTree(plan)
-    click.echo(tree.file_count())
-
-
-@main.command("dir-count", help="Print the total number of directories.")
-@_plan_options
-def dir_count(**kwargs: int) -> None:
-    plan = _make_plan(kwargs)
-    tree = FilesystemTree(plan)
-    click.echo(tree.dir_count())
-
-
 @main.command("path-list", help="Print all paths in the tree.")
 @_plan_options
 def path_list(**kwargs: int) -> None:
@@ -77,17 +61,18 @@ def apply_cmd(target: pathlib.Path, **kwargs: int) -> None:
     tree = FilesystemTree(plan)
 
 
-@main.command("estimate-storage", help="Estimate logical storage for a FilesystemPlan.")
+@main.command("estimate", help="Print analytical estimates for files, directories, and logical storage.")
 @_plan_options
 @click.option("--block-size", type=int, default=4096, help="Block size in bytes.")
 @click.option("--inode-size", type=int, default=256, help="Inode size in bytes.")
 @click.option("--dirent-size", type=int, default=256, help="Directory entry size in bytes.")
-def estimate_storage(
-    block_size: int, inode_size: int, dirent_size: int, **kwargs: int
-) -> None:
+def estimate(block_size: int, inode_size: int, dirent_size: int, **kwargs: int) -> None:
     plan = _make_plan(kwargs)
-    total = plan.estimate_logical_storage(block_size, inode_size, dirent_size)
-    click.echo(total)
+    file_count, dir_count = plan._expected_counts()
+    logical_storage = plan.estimate_logical_storage(block_size, inode_size, dirent_size)
+    click.echo(f"Files:           {file_count}")
+    click.echo(f"Directories:     {dir_count}")
+    click.echo(f"Logical storage: {logical_storage}")
 
 
 if __name__ == "__main__":
